@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-
 class Cart extends StatelessWidget {
   final List<Product> products = [
     Product(
@@ -8,23 +7,25 @@ class Cart extends StatelessWidget {
       price: 200,
       description: 'A beautiful indoor plant to brighten up your space.',
       rating: 4.5,
-      imageUrl: 'https://cdn.pixabay.com/photo/2014/12/11/11/14/blumenstock-564132_960_720.jpg',
+      imageUrl:
+      'https://cdn.pixabay.com/photo/2014/12/11/11/14/blumenstock-564132_960_720.jpg',
     ),
     Product(
       name: 'Glass',
       price: 50,
       description: 'A high-quality glass for everyday use.',
       rating: 4.0,
-      imageUrl: 'https://media.istockphoto.com/id/467521964/photo/isolated-shot-of-disposable-coffee-cup-on-white-background.jpg?s=2048x2048&w=is&k=20&c=CpgJrxWRGtA7ID1IBqAv21o6GTAa1EJOmA2v39rgMq0=',
+      imageUrl:
+      'https://media.istockphoto.com/id/467521964/photo/isolated-shot-of-disposable-coffee-cup-on-white-background.jpg?s=2048x2048&w=is&k=20&c=CpgJrxWRGtA7ID1IBqAv21o6GTAa1EJOmA2v39rgMq0=',
     ),
     Product(
       name: 'Paper',
       price: 25,
       description: 'Recycled paper for all your writing needs.',
       rating: 4.8,
-      imageUrl: 'https://cdn.pixabay.com/photo/2024/01/15/20/51/plate-8510868_1280.jpg',
+      imageUrl:
+      'https://cdn.pixabay.com/photo/2024/01/15/20/51/plate-8510868_1280.jpg',
     ),
-    // Add more products as needed
   ];
 
   Cart({super.key});
@@ -40,75 +41,134 @@ class Cart extends StatelessWidget {
               style: TextStyle(
                 color: Colors.yellow,
                 fontWeight: FontWeight.bold,
+                fontSize: 22,
               ),
             ),
             Spacer(),
             Row(
               children: [
-                Icon(
-                  Icons.currency_bitcoin_outlined,
-                  color: Colors.yellow,
-                  size: 30.0,
-                ),
-                SizedBox(width: 8.0), // Add space between icon and text
+                SizedBox(width: 8.0),
                 Text(
                   "200 Pts",
                   style: TextStyle(
-                    color: Colors.white, // Ensures text is readable
-                    fontWeight: FontWeight.bold, // Adjust size as needed
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
               ],
             ),
           ],
         ),
-        backgroundColor: Colors.green, // Green background color
+        backgroundColor: Colors.green,
+        elevation: 5,
       ),
-      // title: Text('Cart'),
-      // backgroundColor: Colors.green,
-
-      body: ListView.builder(
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final product = products[index];
-          return Card(
-            margin: const EdgeInsets.all(8.0),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(8.0),
-              leading: Image.network(
-                product.imageUrl,
-                width: 125,
-                height: 160,
-                fit: BoxFit.cover,
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: ListView.builder(
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final product = products[index];
+            return Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-              title: Text(product.name),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('\$${product.price.toStringAsFixed(2)}'),
-                  const SizedBox(height: 4),
-                  Text(product.description),
-                  const SizedBox(height: 4),
-                  Text('Rating: ${product.rating.toStringAsFixed(1)} ★'),
-                ],
-              ),
-              trailing: ElevatedButton(
-                onPressed: () {
-                  // Implement the "Buy Now" functionality here
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Row(
+                  children: [
+                    // Product Image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        product.imageUrl,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Product Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            product.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[700],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text(
+                                "\$${product.price.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              const Spacer(),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, color: Colors.amber, size: 20),
+                                  Text(
+                                    "${product.rating.toStringAsFixed(1)}",
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Buy Now Button
+                    ElevatedButton(
+                      onPressed: () {
+                        // Implement the "Buy Now" functionality
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        elevation: 3,
+                      ),
+                      child: const Text(
+                        "Buy",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Text('Buy Now'),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 }
 
+// Product Model
 class Product {
   final String name;
   final double price;
@@ -124,90 +184,3 @@ class Product {
     required this.imageUrl,
   });
 }
-
-
-// import 'package:flutter/material.dart';
-// import 'package:cached_network_image/cached_network_image.dart';
-//
-// void main() {
-//   runApp(MyApp());
-// }
-//
-// class MyApp extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Cart(),
-//     );
-//   }
-// }
-//
-// class Cart extends StatelessWidget {
-//   final List<Product> products = [
-//     Product(
-//       name: 'Plant',
-//       price: 200 ,
-//         imageUrl: 'https://via.placeholder.com/150?text=Product+1',
-//     ),
-//
-//     Product(
-//       name: 'Glass',
-//       price: 50,
-//       imageUrl: 'https://via.placeholder.com/150?text=Product+2',
-//     ),
-//     Product(
-//       name: 'Paper',
-//       price: 25,
-//       imageUrl: 'https://via.placeholder.com/150?text=Product+3',
-//     ),
-//     // Add more products as needed
-//   ];
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Cart'),
-//         backgroundColor: Colors.green,
-//       ),
-//       body: ListView.builder(
-//         itemCount: products.length,
-//         itemBuilder: (context, index) {
-//           final product = products[index];
-//           return Card(
-//             margin: EdgeInsets.all(8.0),
-//             child: ListTile(
-//               contentPadding: EdgeInsets.all(8.0),
-//               leading: CachedNetworkImage(
-//                 imageUrl: product.imageUrl,
-//                 placeholder: (context, url) => CircularProgressIndicator(),
-//                 errorWidget: (context, url, error) => Icon(Icons.error),
-//                 width: 100,
-//                 height: 100,
-//                 fit: BoxFit.cover,
-//               ),
-//               title: Text(product.name),
-//               subtitle: Text('\~${product.price.toStringAsFixed(2)}'),
-//             ),
-//           );
-//         },
-//       ),
-//     );
-//   }
-// }
-//
-// class Product {
-//   final String name;
-//   final double price;
-//   final String imageUrl;
-//
-//   Product({
-//     required this.name,
-//     required this.price,
-//     required this.imageUrl,
-//   });
-// }
-//
-//
-//
-//

@@ -1,0 +1,4 @@
+0 Plastic Waste
+1 Electronic Waste
+2 Wet Waste
+3 Garbage

@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
       case 'citizen':
         return const SecondPage(); // Citizen Dashboard
       case 'worker':
-        return  const WorkerHomeScreen(); // Worker Dashboard
+        return  WorkerHomeScreen(); // Worker Dashboard
       case 'manager':
         return  const ManagerPage(); // Manager Dashboard
       default:
@@ -73,7 +73,7 @@ class MyApp extends StatelessWidget {
         '/res': (context) =>  const PolyGeofenceServic(),
         '/citizen-dashboard': (context) =>  const SecondPage(),
         '/perform': (context) =>  const WorkerStatsScreen(),
-        '/worker-dashboard': (context) =>  const WorkerHomeScreen(),
+        '/worker-dashboard': (context) =>  WorkerHomeScreen(),
         '/manager-dashboard': (context) =>  const ManagerPage(),
         '/trackissues': (context) => TrackIssuesPage(),
         '/cart': (context) => Cart(),

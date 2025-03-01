@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 
 class WorkerHomeScreen extends StatefulWidget {
   const WorkerHomeScreen({super.key});
@@ -12,6 +15,8 @@ class WorkerHomeScreen extends StatefulWidget {
 
 class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   List<WasteReport> tasks = [];
 
   @override
@@ -23,16 +28,28 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   // Fetch the tasks (waste reports) from Firestore
   Future<void> fetchTasks() async {
     try {
-      final snapshot = await _firestore.collection('waste_reports').get();
+      String? workerUid = _auth.currentUser?.uid;
+
+      if (workerUid == null) {
+        print('Worker UID not found.');
+        return;
+      }
+
+      final snapshot = await _firestore
+          .collection('waste_reports')
+          .where('assignedWorker', isEqualTo: workerUid)
+          .get();
+
       setState(() {
         tasks = snapshot.docs.map((doc) {
           return WasteReport(
             id: doc.id,
-            description: doc['description'],
-            imageBase64: doc['imageBase64'],
-            location: doc['location'],
-            timestamp: doc['timestamp'].toDate(),
-            wasteSize: doc['wasteSize'],
+            description: doc['description'] ?? '',
+            imageBase64: doc['imageBase64'] ?? '',
+            location: doc['location'] ?? '',
+            timestamp: (doc['timestamp'] != null) ? doc['timestamp'].toDate() : DateTime.now(),
+            wasteSize: doc['wasteSize'] ?? '',
+            status: doc['status'] ?? 'pending', // ✅ Default to 'pending' if null
           );
         }).toList();
       });
@@ -92,7 +109,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
         itemCount: tasks.length,
         itemBuilder: (context, index) {
           final task = tasks[index];
-          return TaskCard(task: task);
+          return TaskCard(task: task, onUpdate: fetchTasks);
         },
       ),
     );
@@ -101,8 +118,9 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
 class TaskCard extends StatelessWidget {
   final WasteReport task;
+  final VoidCallback onUpdate;
 
-  const TaskCard({super.key, required this.task});
+  TaskCard({super.key, required this.task, required this.onUpdate});
 
   @override
   Widget build(BuildContext context) {
@@ -127,15 +145,33 @@ class TaskCard extends StatelessWidget {
             Text('Waste Size: ${task.wasteSize}'),
             const SizedBox(height: 8),
             Text('Reported At: ${task.timestamp}'),
+            const SizedBox(height: 8),
+            Text(
+              'Status: ${task.status}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: task.status == 'completed' ? Colors.green : Colors.orange,
+              ),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _updateStatus(context, 'in_progress'),
-              child: const Text('Start'),
-            ),
-            ElevatedButton(
-              onPressed: () => _updateStatus(context, 'completed'),
-              child: const Text('Complete'),
-            ),
+
+            if (task.status == 'Assigned')
+              ElevatedButton(
+                onPressed: () => _updateStatus(context, 'started'),
+                child: const Text('Start'),
+              ),
+
+            if (task.status == 'started')
+              ElevatedButton(
+                onPressed: () => _updateStatus(context, 'completed'),
+                child: const Text('Complete'),
+              ),
+
+            if (task.status == 'completed')
+              const Text(
+                'Completed ✅',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
+              ),
           ],
         ),
       ),
@@ -162,19 +198,84 @@ class TaskCard extends StatelessWidget {
 
   Future<void> _updateStatus(BuildContext context, String status) async {
     try {
-      // Here you would update the status with the WasteService
+      final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+      if (status == 'completed') {
+        await _uploadImage(context, ImageSource.camera); // Pass context here
+
+        if (imageBase64.isEmpty) {
+          print("⚠️ No image captured!");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No image selected. Please try again.')),
+          );
+          return;
+        }
+
+        // Update Firestore in "waste_reports"
+        await _firestore.collection('waste_reports').doc(task.id).update({
+          'status': 'completed',
+          'completedImageBase64': imageBase64,
+        });
+
+        // Save completed report in "reported_issues"
+        await _firestore.collection('reported_issues').doc(task.id).set({
+          'description': task.description,
+          'location': task.location,
+          'timestamp': task.timestamp,
+          'wasteSize': task.wasteSize,
+          'imageBase64': task.imageBase64, // Original waste image
+          'completedImageBase64': imageBase64, // Cleaned area image
+          'status': 'completed',
+        });
+
+      } else {
+        await _firestore.collection('waste_reports').doc(task.id).update({
+          'status': 'started',
+        });
+      }
+
+      onUpdate(); // Refresh UI
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Status updated to $status')),
       );
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update status')),
       );
     }
   }
+
+
+  final ImagePicker _picker = ImagePicker();
+  String imageBase64 = '';
+
+  Future<void> _uploadImage(BuildContext context, ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 70,
+      );
+
+      if (image == null) return;
+
+      final File imgFile = File(image.path);
+      final List<int> imageBytes = await imgFile.readAsBytes();
+      imageBase64 = base64Encode(imageBytes);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading image: $e')),
+      );
+    }
+  }
+
+
 }
 
-// Sample classes for WasteReport and Location
+// WasteReport Model
 class WasteReport {
   final String id;
   final String description;
@@ -182,6 +283,7 @@ class WasteReport {
   final String location;
   final DateTime timestamp;
   final String wasteSize;
+  final String status;
 
   WasteReport({
     required this.id,
@@ -190,5 +292,6 @@ class WasteReport {
     required this.location,
     required this.timestamp,
     required this.wasteSize,
+    required this.status, // ✅ Default value
   });
 }

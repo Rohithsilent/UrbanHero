@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 class WorkerManagement extends StatefulWidget {
@@ -11,7 +10,6 @@ class WorkerManagement extends StatefulWidget {
 
 class _WorkerManagementState extends State<WorkerManagement> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   List<Map<String, dynamic>> workers = [];
   List<Map<String, dynamic>> issues = [];
@@ -26,16 +24,17 @@ class _WorkerManagementState extends State<WorkerManagement> {
   // Fetch workers from Firestore
   Future<void> fetchWorkers() async {
     try {
-      // Fetch workers from the 'users' collection, where the role is 'worker'
       final snapshot = await _firestore
           .collection('users')
-          .where('role', isEqualTo: 'worker') // Filtering by role 'worker'
+          .where('role', isEqualTo: 'Worker') // Ensure correct case
           .get();
 
       setState(() {
         workers = snapshot.docs.map((doc) {
           return {
-            'username': doc['username'],  // Fetching the 'username' field from each document
+            'id': doc.id, // Store worker document ID
+            'username': doc['username'], // Display username
+            'email': doc['email'],
           };
         }).toList();
       });
@@ -44,11 +43,11 @@ class _WorkerManagementState extends State<WorkerManagement> {
     }
   }
 
-
   // Fetch issues from Firestore
   Future<void> fetchIssues() async {
     try {
-      final snapshot = await _firestore.collection('waste_reports').get();
+      final snapshot = await _firestore.collection('waste_reports').get(); // Fetch all reports
+
       setState(() {
         issues = snapshot.docs.map((doc) {
           return {
@@ -62,34 +61,31 @@ class _WorkerManagementState extends State<WorkerManagement> {
     }
   }
 
-  // Assign issue to worker and send notification
-  Future<void> assignIssue(String workerId, String issueId, String location) async {
+
+  // Assign issue to worker
+  Future<void> assignIssue(String workerId, String issueId, String workerName) async {
     try {
-      // Update the issue in Firestore
       await _firestore.collection('waste_reports').doc(issueId).update({
-        'assignedWorker': workerId,
+        'assignedWorker': workerId, // Store worker's UID
+        'assignedWorkerName': workerName, // Store worker's username
         'status': 'Assigned',
       });
 
-      // Send a Firebase Cloud Messaging notification
-      await _messaging.sendMessage(
-        to: 'manager_notifications',
-        data: {
-          'title': 'Work Assigned',
-          'body': 'Work assigned at $location',
-        },
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Task assigned to $workerName')),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Work assigned at $location')),
-      );
+      // Refresh issues after assignment
+      fetchIssues();
     } catch (e) {
       print('Error assigning issue: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to assign work')),
+        const SnackBar(content: Text('Failed to assign task')),
       );
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -109,23 +105,36 @@ class _WorkerManagementState extends State<WorkerManagement> {
             ),
             const SizedBox(height: 10),
             Expanded(
-              child: ListView.builder(
-                itemCount: issues.length,
-                itemBuilder: (context, index) {
-                  final issue = issues[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      title: Text('Waste Size: ${issue['wasteSize']}'),
-                      subtitle: Text(
-                          'Description: ${issue['description']}\nLocation: ${issue['location']}'),
-                      trailing: ElevatedButton(
-                        onPressed: () => showWorkerSelection(issue),
-                        child: const Text('Assign'),
+              child: issues.isEmpty
+                  ? const Center(child: Text("No issues available"))
+                  : ListView(
+                children: [
+                  // Unassigned Issues
+                  if (issues.any((issue) => issue['assignedWorker'] == null))
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        'Unassigned Issues',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
-                  );
-                },
+                  ...issues.where((issue) => issue['assignedWorker'] == null).map((issue) {
+                    return issueCard(issue, isAssigned: false);
+                  }).toList(),
+
+                  // Assigned Issues
+                  if (issues.any((issue) => issue['assignedWorker'] != null))
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        'Assigned Issues',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ...issues.where((issue) => issue['assignedWorker'] != null).map((issue) {
+                    return issueCard(issue, isAssigned: true);
+                  }).toList(),
+                ],
               ),
             ),
           ],
@@ -133,6 +142,39 @@ class _WorkerManagementState extends State<WorkerManagement> {
       ),
     );
   }
+
+// Function to build issue cards
+  Widget issueCard(Map<String, dynamic> issue, {required bool isAssigned}) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: ListTile(
+        title: Text('Waste Size: ${issue['wasteSize']}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Description: ${issue['description']}'),
+            Text('Location: ${issue['location']}'),
+            Text(
+              'Assigned Worker: ${issue['assignedWorkerName'] ?? 'Not Assigned'}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isAssigned ? Colors.green : Colors.red,
+              ),
+            ),
+          ],
+        ),
+        trailing: isAssigned
+            ? null // No assign button for already assigned issues
+            : ElevatedButton(
+          onPressed: () => showWorkerSelection(issue),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          child: const Text('Assign'),
+        ),
+      ),
+    );
+  }
+
 
   void showWorkerSelection(Map<String, dynamic> issue) {
     showDialog(
@@ -150,11 +192,11 @@ class _WorkerManagementState extends State<WorkerManagement> {
               itemBuilder: (context, index) {
                 final worker = workers[index];
                 return ListTile(
-                  title: Text(worker['name']),
-                  subtitle: Text('Username: ${worker['username']}'),
+                  title: Text(worker['username']), // Fixed
+                  subtitle: Text(worker['email']), // Show email
                   onTap: () {
                     Navigator.pop(context);
-                    assignIssue(worker['id'], issue['id'], issue['location']);
+                    assignIssue(worker['id'], issue['id'], worker['username']);
                   },
                 );
               },
