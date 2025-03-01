@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
@@ -51,6 +52,7 @@ class _WasteReportFormState extends State<SecondPage> {
   String location = '';
   bool isLoading = false;
   bool isChatOpen = false;
+  String city_loc='';
   List<Map<String, dynamic>> chatMessages = [];
 
   // Dropdown options for waste size
@@ -178,10 +180,23 @@ class _WasteReportFormState extends State<SecondPage> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      setState(() {
-        location = '${position.latitude}, ${position.longitude}';
-        isLoading = false;
-      });
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        String street = place.street ?? 'Unknown Street';
+        String city = place.locality ?? 'Unknown City';
+
+        setState(() {
+          city_loc = '$street, $city';  // Store formatted location
+          location = '${position.latitude}, ${position.longitude}';
+          isLoading = false;
+        });
+      }
+
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -219,6 +234,7 @@ class _WasteReportFormState extends State<SecondPage> {
         'imageBase64': imageBase64,
         'location': location,
         'timestamp': FieldValue.serverTimestamp(),
+        'status': 'In Progress',
       });
 
       setState(() {
@@ -453,7 +469,7 @@ class _WasteReportFormState extends State<SecondPage> {
                         Padding(
                           padding: const EdgeInsets.all(8),
                           child: Text(
-                            'Location: $location',
+                            'Location: $city_loc',
                             style: const TextStyle(
                               fontSize: 16,
                               color: Colors.black87,
@@ -504,406 +520,4 @@ class _WasteReportFormState extends State<SecondPage> {
     );
   }
 }
-//
-// import 'dart:io';
-// import 'package:firebase_storage/firebase_storage.dart';
-// import 'package:flutter/material.dart';
-// import 'package:image_picker/image_picker.dart';
-// import 'package:location/location.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'cart.dart';
-//
-// class ChatBot {
-//   String getResponse(String userQuery) {
-//     String query = userQuery.toLowerCase();
-//
-//     if (query.contains('recycle')) {
-//       return 'To recycle correctly, separate your waste into categories like plastic, paper, metal, and organic.';
-//     } else if (query.contains('points')) {
-//       return 'You earn points by uploading images of collected waste. These points can be redeemed for eco-friendly products!';
-//     } else if (query.contains('upload')) {
-//       return 'To upload an image, go to the “Upload Waste” section, select a photo, and submit!';
-//     } else if (query.contains('how to use')) {
-//       return 'This app helps you collect, report, and recycle waste. You can also track your points and redeem them for rewards.';
-//     } else if (query.contains("hi")) {
-//       return 'Hello, Welcome To Urban Hero!';
-//     } else {
-//       return 'Sorry, I did not understand. Try asking about recycling or points!';
-//     }
-//   }
-// }
-//
-// class SecondPage extends StatefulWidget {
-//   const SecondPage({super.key});
-//
-//   @override
-//   _SecondPageState createState() => _SecondPageState();
-// }
-//
-// class _SecondPageState extends State<SecondPage> {
-//   XFile? _selectedImage;
-//   LocationData? _locationData;
-//   bool _isChatOpen = false;
-//   final ChatBot _chatBot = ChatBot();
-//   final TextEditingController _messageController = TextEditingController();
-//   final List<Map<String, String>> _messages = [];
-//   final TextEditingController _volumeController = TextEditingController();
-//   final TextEditingController _descriptionController = TextEditingController();
-//   String? _selectedVolume;
-//
-//   // Pick image from gallery
-//   Future<void> _pickImage() async {
-//     final ImagePicker picker = ImagePicker();
-//     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-//     setState(() {
-//       _selectedImage = image;
-//     });
-//   }
-//
-//   // Capture image using camera
-//   Future<void> _captureImageWithCamera() async {
-//     final ImagePicker picker = ImagePicker();
-//     try {
-//       final XFile? image = await picker.pickImage(source: ImageSource.camera);
-//       if (image != null) {
-//         setState(() {
-//           _selectedImage = image;
-//         });
-//       } else {
-//         print("No image captured.");
-//       }
-//     } catch (e) {
-//       print("Error accessing camera: $e");
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text("Unable to access the camera on this device.")),
-//       );
-//     }
-//   }
-//
-//   // Get location
-//   Future<void> _getLocation() async {
-//     final Location location = Location();
-//     LocationData locationData = await location.getLocation();
-//     setState(() {
-//       _locationData = locationData;
-//     });
-//   }
-//
-//   // Toggle chat window visibility
-//   void _toggleChat() {
-//     setState(() {
-//       _isChatOpen = !_isChatOpen;
-//       if (_messages.isEmpty) {
-//         _messages.add({
-//           "sender": "ChatBot",
-//           "text": _chatBot.getResponse("hello"),
-//         });
-//       }
-//     });
-//   }
-//
-//   // Send message to chatbot
-//   void _sendMessage(String message) {
-//     setState(() {
-//       _messages.add({
-//         "sender": "You",
-//         "text": message,
-//       });
-//       String response = _chatBot.getResponse(message);
-//       _messages.add({
-//         "sender": "ChatBot",
-//         "text": response,
-//       });
-//       _messageController.clear();
-//     });
-//   }
-//
-//   // Submit waste details to Firebase
-//   Future<void> _submitWasteDetails() async {
-//     if (_selectedImage == null || _locationData == null) {
-//       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-//         content: Text("Please complete all fields (image, location, etc.)."),
-//       ));
-//       return;
-//     }
-//
-//     // Upload image to Firebase Storage
-//     final storageRef = FirebaseStorage.instance.ref().child('waste_images/${DateTime.now().toString()}.jpg');
-//     await storageRef.putFile(File(_selectedImage!.path));
-//     String imageUrl = await storageRef.getDownloadURL();
-//
-//     // Submit data to Firestore
-//     final wasteCollection = FirebaseFirestore.instance.collection('wasteReports');
-//     await wasteCollection.add({
-//       'volume': _selectedVolume,
-//       'description': _descriptionController.text,
-//       'imageUrl': imageUrl,
-//       'location': {
-//         'latitude': _locationData!.latitude,
-//         'longitude': _locationData!.longitude,
-//       },
-//       'timestamp': FieldValue.serverTimestamp(),
-//     });
-//
-//     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-//       content: Text("Waste reported successfully!"),
-//     ));
-//
-//     // Clear fields after submission
-//     setState(() {
-//       _selectedImage = null;
-//       _locationData = null;
-//       _volumeController.clear();
-//       _descriptionController.clear();
-//     });
-//   }
-//
-//   // Show image preview in a dialog
-//   void _showImagePreview() {
-//     if (_selectedImage != null) {
-//       showDialog(
-//         context: context,
-//         builder: (BuildContext context) {
-//           return Dialog(
-//             backgroundColor: Colors.black,
-//             child: Container(
-//               color: Colors.black,
-//               child: Center(
-//                 child: Image.file(
-//                   File(_selectedImage!.path),
-//                   fit: BoxFit.cover,
-//                 ),
-//               ),
-//             ),
-//           );
-//         },
-//       );
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final screenWidth = MediaQuery.of(context).size.width;
-//     final screenHeight = MediaQuery.of(context).size.height;
-//
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text("Urban Hero"),
-//         backgroundColor: Colors.yellowAccent,
-//         actions: [
-//           IconButton(
-//             icon: Icon(Icons.shopping_cart),
-//             onPressed: () {
-//               Navigator.push(
-//                 context,
-//                 MaterialPageRoute(builder: (context) => Cart()),
-//               );
-//             },
-//           ),
-//         ],
-//       ),
-//       drawer: Drawer(
-//         child: ListView(
-//           padding: EdgeInsets.zero,
-//           children: [
-//             DrawerHeader(
-//               decoration: BoxDecoration(
-//                 color: Colors.yellowAccent,
-//               ),
-//               child: Text(
-//                 'Menu',
-//                 style: TextStyle(
-//                   color: Colors.black,
-//                   fontSize: 24,
-//                 ),
-//               ),
-//             ),
-//             ListTile(
-//               leading: Icon(Icons.track_changes_sharp),
-//               title: Text('Track Your Issues'),
-//               onTap: () {
-//                 Navigator.pushNamed(context, '/trackissues');
-//               },
-//             ),
-//             ListTile(
-//               leading: Icon(Icons.contact_page_sharp),
-//               title: Text('Profile'),
-//               onTap: () {
-//                 Navigator.pushNamed(context, '/profilec');
-//               },
-//             ),
-//             ListTile(
-//               leading: Icon(Icons.store),
-//               title: Text('Eco Store'),
-//               onTap: () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(builder: (context) => Cart()),
-//                 );
-//               },
-//             ),
-//           ],
-//         ),
-//       ),
-//       body: GestureDetector(
-//         onTap: () {
-//           if (_isChatOpen) {
-//             _toggleChat(); // Close the chat if tapping outside
-//           }
-//         },
-//         child: Stack(
-//           children: [
-//             Center(
-//               child: SingleChildScrollView(
-//                 padding: EdgeInsets.all(16.0),
-//                 child: Column(
-//                   mainAxisAlignment: MainAxisAlignment.center,
-//                   crossAxisAlignment: CrossAxisAlignment.center,
-//                   children: [
-//                     Text(
-//                       "Report Waste Issue",
-//                       style: Theme.of(context).textTheme.headlineSmall,
-//                     ),
-//                     SizedBox(height: 20),
-//                     DropdownButtonFormField<String>(
-//                       value: _selectedVolume, // Replace controller with value
-//                       items: ['Large', 'Medium', 'Small']
-//                           .map((String value) => DropdownMenuItem<String>(
-//                         value: value,
-//                         child: Text(value),
-//                       ))
-//                           .toList(),
-//                       onChanged: (value) {
-//                         setState(() {
-//                           _selectedVolume = value; // Store the selected volume
-//                         });
-//                       },
-//                       decoration: InputDecoration(
-//                         labelText: 'Select Waste Volume',
-//                         border: OutlineInputBorder(),
-//                       ),
-//                     ),
-//                     SizedBox(height: 20),
-//                     TextField(
-//                       controller: _descriptionController,
-//                       maxLines: 3,
-//                       decoration: InputDecoration(
-//                         labelText: 'Describe the waste issue in your area',
-//                         border: OutlineInputBorder(),
-//                       ),
-//                     ),
-//                     SizedBox(height: 20),
-//                     Row(
-//                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-//                       children: [
-//                         ElevatedButton.icon(
-//                           onPressed: _pickImage,
-//                           icon: Icon(Icons.upload_file),
-//                           label: Text('Upload Image'),
-//                         ),
-//                         ElevatedButton.icon(
-//                           onPressed: _captureImageWithCamera,
-//                           icon: Icon(Icons.camera_alt),
-//                           label: Text('Capture Image'),
-//                         ),
-//                       ],
-//                     ),
-//                     // Preview Button for showing full image in dialog
-//                     if (_selectedImage != null)
-//                       ElevatedButton(
-//                         onPressed: _showImagePreview,
-//                         child: Text('Preview Image'),
-//                       ),
-//                     //Image preview
-//                     SizedBox(height: 20),
-//                   ElevatedButton.icon(
-//                     onPressed: _getLocation,
-//                     icon: Icon(Icons.location_on),
-//                     label: Text('Get Location'),
-//                   ),
-//                     if (_locationData != null)
-//                       Padding(
-//                         padding: const EdgeInsets.all(8.0),
-//                         child: Text(
-//                           'Latitude: ${_locationData!.latitude}, Longitude: ${_locationData!.longitude}',
-//                           style: TextStyle(fontSize: 16),
-//                         ),
-//                       ),
-//                     SizedBox(height: 20),
-//                     ElevatedButton(
-//                       onPressed: _submitWasteDetails,
-//                       child: Text("Submit Waste Issue"),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//             if (_isChatOpen)
-//               Positioned(
-//                 bottom: 0,
-//                 child: Container(
-//                   width: screenWidth,
-//                   height: screenHeight * 0.4,
-//                   color: Colors.white,
-//                   child: Column(
-//                     children: [
-//                       Expanded(
-//                         child: ListView.builder(
-//                           itemCount: _messages.length,
-//                           itemBuilder: (context, index) {
-//                             final message = _messages[index];
-//                             return ListTile(
-//                               title: Align(
-//                                 alignment: message['sender'] == "ChatBot"
-//                                     ? Alignment.centerLeft
-//                                     : Alignment.centerRight,
-//                                 child: Container(
-//                                   padding: EdgeInsets.all(8),
-//                                   decoration: BoxDecoration(
-//                                     color: message['sender'] == "ChatBot"
-//                                         ? Colors.grey[300]
-//                                         : Colors.blue[200],
-//                                     borderRadius: BorderRadius.circular(12),
-//                                   ),
-//                                   child: Text(message['text'] ?? ""),
-//                                 ),
-//                               ),
-//                             );
-//                           },
-//                         ),
-//                       ),
-//                       Padding(
-//                         padding: const EdgeInsets.all(8.0),
-//                         child: Row(
-//                           children: [
-//                             Expanded(
-//                               child: TextField(
-//                                 controller: _messageController,
-//                                 decoration: InputDecoration(
-//                                   hintText: 'Ask me anything...',
-//                                   border: OutlineInputBorder(),
-//                                 ),
-//                               ),
-//                             ),
-//                             IconButton(
-//                               icon: Icon(Icons.send),
-//                               onPressed: () {
-//                                 String userMessage = _messageController.text.trim();
-//                                 if (userMessage.isNotEmpty) {
-//                                   _sendMessage(userMessage);
-//                                 }
-//                               },
-//                             ),
-//                           ],
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
+

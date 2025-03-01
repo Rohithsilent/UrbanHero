@@ -1,5 +1,9 @@
+import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:latlong2/latlong.dart';
 
 class MapPage extends StatefulWidget {
@@ -10,241 +14,194 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  List<LatLng> coordinates = [];
-  List<Map<String, dynamic>> zones = [];
-  String _zoneType = 'restricted';
-  TextEditingController latController = TextEditingController();
-  TextEditingController longController = TextEditingController();
-  TextEditingController zoneNameController = TextEditingController();
-  List<Polygon> polygons = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final MapController _mapController = MapController();
+  final TextEditingController issueController = TextEditingController();
 
-  void deleteZone(int index) {
-    setState(() {
-      zones.removeAt(index);
-      polygons.removeAt(index);
+  List<Map<String, dynamic>> reportedIssues = [];
+  double _currentZoom = 10.0; // Default zoom level
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReportedIssues();
+
+    // ✅ Listen for zoom changes and update state
+    _mapController.mapEventStream.listen((event) {
+      setState(() {
+        _currentZoom = _mapController.camera.zoom; // ✅ Update zoom level in state
+      });
     });
   }
 
-  Widget _buildPolygonLayer() {
-    // Only create the PolygonLayer if there are polygons to display
-    if (polygons.isEmpty && coordinates.isEmpty) {
-      return const SizedBox.shrink(); // Return empty widget if no polygons
+  // Fetch reported issues from Firestore
+  Future<void> _fetchReportedIssues() async {
+    try {
+      final snapshot = await _firestore.collection('waste_reports').get();
+      List<Map<String, dynamic>> issues = [];
+
+      for (var doc in snapshot.docs) {
+        var data = doc.data();
+        if (data.containsKey('location')) {
+          List<String> latLng = data['location'].split(',');
+          double? lat = double.tryParse(latLng[0].trim());
+          double? lon = double.tryParse(latLng[1].trim());
+
+          if (lat != null && lon != null) {
+            issues.add({
+              'id': doc.id,
+              'location': LatLng(lat, lon),
+              'description': data['description'] ?? "No Description",
+              'status': data['status'] ?? "Unassigned",
+              'assignedWorkerName': data['assignedWorkerName'] ?? "Not Assigned",
+              'formattedAddress': data['formattedAddress'] ?? "Unknown Address",
+            });
+          }
+        }
+      }
+
+      setState(() {
+        reportedIssues = issues;
+      });
+    } catch (e) {
+      print("Error fetching reported issues: $e");
     }
+  }
 
-    List<Polygon> allPolygons = List<Polygon>.from(polygons);
-
-    // Add the current in-progress polygon if there are coordinates
-    if (coordinates.isNotEmpty) {
-      allPolygons.add(
-        Polygon(
-          points: coordinates,
-          color: _zoneType == 'restricted'
-              ? Colors.red.withOpacity(0.3)
-              : Colors.green.withOpacity(0.3),
-          borderStrokeWidth: 2.0,
-          borderColor: _zoneType == 'restricted'
-              ? Colors.red
-              : Colors.green,
+  // Report a new issue when tapping the map
+  void _reportIssue(LatLng point) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Issue'),
+        content: TextField(
+          controller: issueController,
+          decoration: const InputDecoration(labelText: 'Issue Description'),
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (issueController.text.isNotEmpty) {
+                await _firestore.collection('waste_reports').add({
+                  'description': issueController.text,
+                  'location': '${point.latitude}, ${point.longitude}',
+                  'formattedAddress': 'Fetching...', // Placeholder
+                  'status': 'Unassigned',
+                });
 
-    return PolygonLayer(polygons: allPolygons);
+                _fetchReportedIssues(); // Refresh markers
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MapZones'),
+        title: const Text('Reported Issues Map'),
         backgroundColor: Colors.green,
       ),
-      body: Stack(
+      body: FlutterMap(
+        mapController: _mapController, // Attach controller
+        options: MapOptions(
+          initialCenter: const LatLng(17.380326, 78.382345),
+          minZoom: 6.0,
+          maxZoom: 18.0,
+          onTap: (_, point) => _reportIssue(point),
+        ),
         children: [
-          FlutterMap(
-            options: const MapOptions(
-              initialCenter: LatLng(17.380326, 78.382345),
-              minZoom: 6.0,
+          TileLayer(
+            urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            subdomains: const ['a', 'b', 'c'],
+          ),
+
+          // ✅ Heatmap is always visible
+          HeatMapLayer(
+            heatMapDataSource: InMemoryHeatMapDataSource(
+              data: reportedIssues.expand((issue) {
+                LatLng location = issue['location'];
+                return [
+                  WeightedLatLng(location, 1.0), // Center Point (High Intensity)
+                  WeightedLatLng(_offsetLocation(location, 0.5, 0.0), 0.6), // 500m Offset
+                  WeightedLatLng(_offsetLocation(location, -0.5, 0.0), 0.6),
+                  WeightedLatLng(_offsetLocation(location, 0.0, 0.5), 0.6),
+                  WeightedLatLng(_offsetLocation(location, 0.0, -0.5), 0.6),
+                  WeightedLatLng(_offsetLocation(location, 1.0, 0.0), 0.3), // 1km Offset
+                  WeightedLatLng(_offsetLocation(location, -1.0, 0.0), 0.3),
+                  WeightedLatLng(_offsetLocation(location, 0.0, 1.0), 0.3),
+                  WeightedLatLng(_offsetLocation(location, 0.0, -1.0), 0.3),
+                ];
+              }).toList(),
             ),
-            children: [
-              TileLayer(
-                urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                subdomains: const ['a', 'b', 'c'],
-              ),
-              MarkerLayer(
-                markers: coordinates.map(
-                      (coordinate) => Marker(
-                    point: coordinate,
-                    child: const Icon(
-                      Icons.location_on,
-                      color: Colors.blue,
-                      size: 30.0,
-                    ),
+          ),
+
+          // ✅ Show markers only if zoom level is 14 or higher
+          if (_currentZoom >= 14.0)
+            MarkerLayer(
+              markers: reportedIssues.map((issue) {
+                Color markerColor;
+                switch (issue['status']) {
+                  case 'In Progress':
+                    markerColor = Colors.yellow;
+                    break;
+                  case 'Resolved':
+                    markerColor = Colors.green;
+                    break;
+                  default:
+                    markerColor = Colors.red; // Unassigned
+                }
+
+                return Marker(
+                  point: issue['location'],
+                  width: 40,
+                  height: 40,
+                  child: GestureDetector(
+                    onTap: () => _showIssueDetails(issue),
+                    child: Icon(Icons.location_on, color: markerColor, size: 35.0),
                   ),
-                ).toList(),
-              ),
-              _buildPolygonLayer(), // Use the new method here
-            ],
-          ),
-          DraggableScrollableSheet(
-            minChildSize: 0.2,
-            maxChildSize: 0.7,
-            initialChildSize: 0.5,
-            builder: (BuildContext context, ScrollController scrollController) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black26)],
-                ),
-                padding: const EdgeInsets.all(16.0),
-                child: ListView(
-                  controller: scrollController,
-                  children: [
-                    TextField(
-                      controller: zoneNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Zone Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: latController,
-                            decoration: const InputDecoration(
-                              labelText: 'Latitude',
-                              border: OutlineInputBorder(),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: longController,
-                            decoration: const InputDecoration(
-                              labelText: 'Longitude',
-                              border: OutlineInputBorder(),
-                            ),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () => setState(() => _zoneType = 'restricted'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _zoneType == 'restricted' ? Colors.red : Colors.grey,
-                          ),
-                          child: const Text('Restricted'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => setState(() => _zoneType = 'throwable'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _zoneType == 'throwable' ? Colors.green : Colors.grey,
-                          ),
-                          child: const Text('Throwable'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            double lat = double.tryParse(latController.text) ?? 0.0;
-                            double lon = double.tryParse(longController.text) ?? 0.0;
-                            if (lat != 0.0 && lon != 0.0) {
-                              setState(() {
-                                coordinates.add(LatLng(lat, lon));
-                              });
-                            }
-                          },
-                          child: const Text('Add Coordinates'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (coordinates.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please add coordinates before creating a zone')),
-                              );
-                              return;
-                            }
-                            if (coordinates.length < 4) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('At least 4 coordinates are required to create a zone')),
-                              );
-                              return;
-                            }
-                            setState(() {
-                              String zoneName = zoneNameController.text.isEmpty
-                                  ? 'Zone ${zones.length + 1}'
-                                  : zoneNameController.text;
-
-                              zones.add({
-                                'name': zoneName,
-                                'coordinates': List.from(coordinates),
-                                'type': _zoneType,
-                              });
-
-                              polygons.add(
-                                Polygon(
-                                  points: List.from(coordinates),
-                                  color: _zoneType == 'restricted'
-                                      ? Colors.red.withOpacity(0.5)
-                                      : Colors.green.withOpacity(0.5),
-                                  borderStrokeWidth: 3.0,
-                                  borderColor: _zoneType == 'restricted'
-                                      ? Colors.red
-                                      : Colors.green,
-                                ),
-                              );
-                              coordinates.clear();
-                              zoneNameController.clear();
-                            });
-                          },
-                          child: const Text('Add Zone'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Added Zones:',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: zones.length,
-                      itemBuilder: (context, index) {
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 5),
-                          child: ListTile(
-                            title: Text(zones[index]['name']),
-                            subtitle: Text('Coordinates: ${zones[index]['coordinates'].map((coord) => '(${coord.latitude}, ${coord.longitude})').join(', ')}'),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => deleteZone(index),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
+  }
+
+  // ✅ Show issue details when a marker is tapped
+  void _showIssueDetails(Map<String, dynamic> issue) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Issue Details"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("📌 Location: ${issue['formattedAddress']}"),
+            Text("📝 Description: ${issue['description']}"),
+            Text("📍 Status: ${issue['status']}"),
+            Text("👷 Assigned Worker: ${issue['assignedWorkerName']}"),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close")),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Adjust location by km offsets
+  LatLng _offsetLocation(LatLng base, double kmNorthSouth, double kmEastWest) {
+    const double earthRadius = 6371.0;
+    double latOffset = (kmNorthSouth / earthRadius) * (180 / 3.141592653589793);
+    double lonOffset = (kmEastWest / earthRadius) * (180 / 3.141592653589793) /
+        (cos(base.latitude * 3.141592653589793 / 180));
+
+    return LatLng(base.latitude + latOffset, base.longitude + lonOffset);
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -12,6 +13,8 @@ class WorkerHomeScreen extends StatefulWidget {
 
 class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance; // Firebase Authentication
+
   List<WasteReport> tasks = [];
 
   @override
@@ -23,7 +26,18 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   // Fetch the tasks (waste reports) from Firestore
   Future<void> fetchTasks() async {
     try {
-      final snapshot = await _firestore.collection('waste_reports').get();
+      String? workerUid = _auth.currentUser?.uid; // Get the worker's UID
+
+      if (workerUid == null) {
+        print('Worker UID not found.');
+        return;
+      }
+
+      final snapshot = await _firestore
+          .collection('waste_reports')
+          .where('assignedWorker', isEqualTo: workerUid) // Fetch only assigned reports
+          .get();
+
       setState(() {
         tasks = snapshot.docs.map((doc) {
           return WasteReport(
@@ -40,6 +54,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       print('Error fetching tasks: $e');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

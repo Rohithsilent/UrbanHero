@@ -1,0 +1,2 @@
+D:/Projects/react_js/UrbanHero-master/android/app/.cxx/Debug/6v1c3m19/x86/CMakeFiles/edit_cache.dir
+D:/Projects/react_js/UrbanHero-master/android/app/.cxx/Debug/6v1c3m19/x86/CMakeFiles/rebuild_cache.dir

@@ -58,6 +58,10 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^13.0.0
   provider: ^6.1.2
+  geocoding: any
+  fl_chart: ^0.63.0
+  flutter_map_heatmap: ^0.0.6
+
 
 flutter1:
   uses-material-design: true
