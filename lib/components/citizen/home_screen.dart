@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
@@ -354,7 +355,16 @@ class _WasteReportFormState extends State<SecondPage> {
       // Determine status based on worker assignment
       String status = assignedWorkerId.isNotEmpty ? "Assigned" : "In Progress";
 
+      String userId = "Anonymous";
+
+      // If using Firebase Authentication:
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        userId = user.uid;
+      }
+
       await _firestore.collection('waste_reports').add({
+        'userId': userId,
         'wasteSize': wasteSize,
         'description': description,
         'imageBase64': imageBase64,
@@ -466,6 +476,11 @@ class _WasteReportFormState extends State<SecondPage> {
               leading: const Icon(Icons.store, color: Colors.orange),
               title: const Text('Eco Store'),
               onTap: () => Navigator.pushNamed(context, '/cart'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.store, color: Colors.orange),
+              title: const Text('Standings'),
+              onTap: () => Navigator.pushNamed(context, '/Standings'),
             ),
           ],
         ),

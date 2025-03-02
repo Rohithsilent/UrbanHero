@@ -1,3 +1,4 @@
+import 'package:UrbanHero/components/citizen/standings.dart';
 import 'package:UrbanHero/screens/flutter-login.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +79,8 @@ class MyApp extends StatelessWidget {
         '/trackissues': (context) => TrackIssuesPage(),
         '/cart': (context) => Cart(),
         '/assign': (context) => const WorkerManagement(),
+        '/Standings': (context) => const Standings(),
+
       },
     );
   }
