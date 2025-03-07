@@ -42,7 +42,7 @@ Our project addresses these issues through an AI-powered waste management platfo
 
 | Citizen Features 👥 | Worker Features 👨‍🌾 | Manager Features 🦸‍♂️ |
 |---------------------|---------------------|----------------------|
-| ![Citizen GIF](./assets/gif/citizen1.gif) | ![Hospital GIF](./assets/gif/worker.gif) | ![Blood Bank GIF](./assets/gif/manager.gif) |
+| ![Citizen GIF](./assets/gif/citizen1.gif) | ![Hospital GIF](./assets/gif/woker.gif) | ![Blood Bank GIF](./assets/gif/manager.gif) |
 
 ---
 
