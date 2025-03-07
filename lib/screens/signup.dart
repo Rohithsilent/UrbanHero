@@ -22,7 +22,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String? selectedRole;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
-  String? workerLocation; // Stores latitude,longitude
+  String? workerLocation;
 
   @override
   void dispose() {
@@ -32,43 +32,33 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  // 🔍 Fetch user's location
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // ✅ Check if location services are enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enable location services'))
-      );
+          const SnackBar(content: Text('Enable location services')));
       return;
     }
 
-    // ✅ Request permission
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permissions are permanently denied.'))
-        );
+            const SnackBar(content: Text('Location permissions are permanently denied.')));
         return;
       }
     }
 
-    // ✅ Get current location
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high
-    );
-
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     setState(() {
-      workerLocation = "${position.latitude}, ${position.longitude}"; // Store location
+      workerLocation = "${position.latitude}, ${position.longitude}";
     });
   }
 
-  // 📝 Signup function
   Future<void> signupUser(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
     if (selectedRole == null) {
@@ -92,7 +82,6 @@ class _SignupScreenState extends State<SignupScreen> {
         'role': selectedRole,
       };
 
-      // 📌 Store location if user is a Worker
       if (selectedRole == "Worker" && workerLocation != null) {
         userData['location'] = workerLocation;
       }
@@ -160,8 +149,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 24),
                           Text('Create Account', style: Theme.of(context).textTheme.headlineSmall),
                           const SizedBox(height: 24),
-
-                          // Username Input
                           TextFormField(
                             controller: usernameController,
                             decoration: InputDecoration(
@@ -173,10 +160,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             validator: (value) => value!.isEmpty ? 'Please enter a username' : null,
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Email Input
                           TextFormField(
                             controller: emailController,
                             keyboardType: TextInputType.emailAddress,
@@ -187,14 +171,9 @@ class _SignupScreenState extends State<SignupScreen> {
                               filled: true,
                               fillColor: Colors.grey[50],
                             ),
-                            validator: (value) => value!.isEmpty || !value.contains('@')
-                                ? 'Please enter a valid email'
-                                : null,
+                            validator: (value) => value!.isEmpty || !value.contains('@') ? 'Please enter a valid email' : null,
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Password Input
                           TextFormField(
                             controller: passwordController,
                             obscureText: !_isPasswordVisible,
@@ -204,9 +183,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               suffixIcon: IconButton(
                                 icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
                                 onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
+                                  setState(() => _isPasswordVisible = !_isPasswordVisible);
                                 },
                               ),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -215,35 +192,25 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             validator: (value) => value!.length < 6 ? 'Password must be at least 6 characters' : null,
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Role Selection
                           DropdownButtonFormField<String>(
                             value: selectedRole,
                             decoration: const InputDecoration(labelText: "Select Role"),
-                            items: ["Citizen", "Worker", "Manager"].map((role) {
-                              return DropdownMenuItem(value: role, child: Text(role));
-                            }).toList(),
+                            items: ["Citizen", "Worker", "Manager"].map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
                             onChanged: (value) async {
-                              setState(() {
-                                selectedRole = value;
-                              });
-
-                              if (value == "Worker") {
-                                await _getCurrentLocation();
-                              }
+                              setState(() => selectedRole = value);
+                              if (value == "Worker") await _getCurrentLocation();
                             },
                           ),
-
                           const SizedBox(height: 24),
-
-                          // Signup Button
                           ElevatedButton(
                             onPressed: _isLoading ? null : () => signupUser(context),
-                            child: _isLoading
-                                ? const CircularProgressIndicator()
-                                : const Text("Sign Up"),
+                            child: _isLoading ? const CircularProgressIndicator() : const Text("Sign Up"),
+                          ),
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Back to Sign In"),
                           ),
                         ],
                       ),
