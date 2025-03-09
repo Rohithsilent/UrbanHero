@@ -283,6 +283,7 @@ class WasteReportDashboard extends StatelessWidget {
 
         int i = 0;
         wasteTypeData.forEach((key, value) {
+          // Create bar groups WITHOUT any visible values
           barGroups.add(
             BarChartGroupData(
               x: i,
@@ -290,13 +291,14 @@ class WasteReportDashboard extends StatelessWidget {
                 BarChartRodData(
                   toY: value.toDouble(),
                   color: colors[i % colors.length],
-                  width: 20,
+                  width: 22,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(6),
                     topRight: Radius.circular(6),
                   ),
                 )
               ],
+              // Do NOT set any indicators here
             ),
           );
           i++;
@@ -316,7 +318,7 @@ class WasteReportDashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
-                  height: 200,
+                  height: 260,
                   child: barGroups.isNotEmpty
                       ? BarChart(
                     BarChartData(
@@ -325,17 +327,74 @@ class WasteReportDashboard extends StatelessWidget {
                           .fold(0, (max, value) => value > max ? value : max)
                           .toDouble() * 1.2,
                       barGroups: barGroups,
+                      // ONLY show values when tapping
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        handleBuiltInTouches: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          tooltipBgColor: Colors.blueGrey.shade700,
+                          tooltipPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          tooltipMargin: 8,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            String wasteName = wasteTypeData.keys.elementAt(group.x.toInt());
+                            return BarTooltipItem(
+                              '${rod.toY.toInt()} reports',
+                              const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: '\n',
+                                ),
+                                TextSpan(
+                                  text: wasteName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        // Ensure no indicator persists after tap is released
+                        touchCallback: (event, response) {
+                          // This can be customized to clear any persistent indicators
+                          return;
+                        },
+                      ),
                       titlesData: FlTitlesData(
                         show: true,
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
+                            reservedSize: 60,
                             getTitlesWidget: (value, meta) {
                               if (value >= 0 && value < wasteTypeData.keys.length) {
+                                String label = wasteTypeData.keys.elementAt(value.toInt());
+                                // Split long waste type names
+                                if (label.length > 10) {
+                                  var words = label.split(' ');
+                                  if (words.length > 1) {
+                                    // Join first word on first line, rest on second line
+                                    label = '${words[0]}\n${words.sublist(1).join(' ')}';
+                                  } else if (label.length > 12) {
+                                    // For very long single words
+                                    label = '${label.substring(0, 10)}...';
+                                  }
+                                }
+
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
-                                    wasteTypeData.keys.elementAt(value.toInt()),
+                                    label,
+                                    textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
@@ -351,14 +410,16 @@ class WasteReportDashboard extends StatelessWidget {
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
+                            reservedSize: 38,
                             getTitlesWidget: (value, meta) {
-                              if (value % 5 == 0) {
+                              // Only show integers, not decimals
+                              if (value == value.roundToDouble() && value % 2 == 0) {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8.0),
                                   child: Text(
                                     value.toInt().toString(),
                                     style: const TextStyle(
-                                      color: Colors.black,
+                                      color: Colors.black54,
                                       fontSize: 10,
                                     ),
                                   ),
@@ -368,14 +429,62 @@ class WasteReportDashboard extends StatelessWidget {
                             },
                           ),
                         ),
-                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        // Explicitly disable top titles to ensure no values show
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                       ),
-                      gridData: FlGridData(show: false),
-                      borderData: FlBorderData(show: false),
+                      gridData: FlGridData(
+                        show: true,
+                        horizontalInterval: 2,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.2),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border(
+                          bottom: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                          left: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                        ),
+                      ),
                     ),
                   )
                       : const Center(child: Text('No data to display')),
+                ),
+
+                // Helper text to guide users
+                const SizedBox(height: 16),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.touch_app, size: 16, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tap on bars to see number of reports',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -629,71 +738,109 @@ class TaskStatusDetailPage extends StatelessWidget {
   }
 
   Widget _buildStatusTracker(BuildContext context, String currentStatus) {
-    final statuses = ['Not Assigned', 'Assigned', 'In Progress', 'started', 'completed'];
-    final currentIndex = statuses.indexOf(currentStatus);
+    // Normalize status for comparison (handle different cases and variants)
+    String normalizedStatus = currentStatus.toLowerCase();
 
-    return Column(
-      children: [
-        Row(
-          children: List.generate(
-            statuses.length,
-                (index) {
-              final isActive = index <= currentIndex;
-              final isLast = index == statuses.length - 1;
+    // Map of statuses with their display names and order
+    final statusMap = {
+      'not assigned': {'display': 'Not Assigned', 'order': 0},
+      'assigned': {'display': 'Assigned', 'order': 1},
+      'in progress': {'display': 'In Progress', 'order': 2},
+      'started': {'display': 'Started', 'order': 3},
+      'completed': {'display': 'Completed', 'order': 4},
+    };
 
-              return Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: isActive ? Colors.green : Colors.grey[300],
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: isActive
-                                  ? const Icon(Icons.check, color: Colors.white, size: 16)
-                                  : Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: isActive ? Colors.white : Colors.grey[600],
-                                ),
-                              ),
-                            ),
+    // Get current status index (default to 0 if not found)
+    final currentIndex = statusMap[normalizedStatus]?['order'] as int? ?? 0;
+
+    // Create properly typed ordered statuses for display
+    final List<String> orderedStatuses = [
+      statusMap['not assigned']!['display'] as String,
+      statusMap['assigned']!['display'] as String,
+      statusMap['in progress']!['display'] as String,
+      statusMap['started']!['display'] as String,
+      statusMap['completed']!['display'] as String,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(
+          orderedStatuses.length,
+              (index) {
+            final isActive = index <= currentIndex;
+            final isLast = index == orderedStatuses.length - 1;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Column for circle and connecting line
+                SizedBox(
+                  width: 30,
+                  child: Column(
+                    children: [
+                      // Status circle
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.green : Colors.grey[300],
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isActive ? Colors.green.shade700 : Colors.grey.shade400,
+                            width: 1,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            statuses[index],
+                        ),
+                        child: Center(
+                          child: isActive
+                              ? const Icon(Icons.check, color: Colors.white, size: 14)
+                              : Text(
+                            '${index + 1}',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                              color: isActive ? Colors.black : Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                              color: isActive ? Colors.white : Colors.grey[600],
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                        ],
-                      ),
-                    ),
-                    if (!isLast)
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          height: 3,
-                          color: index < currentIndex ? Colors.green : Colors.grey[300],
                         ),
                       ),
-                  ],
+
+                      // Connecting line (if not the last item)
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 30,
+                          color: index < currentIndex ? Colors.green : Colors.grey[300],
+                        ),
+                    ],
+                  ),
                 ),
-              );
-            },
-          ),
+
+                // Status text
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          orderedStatuses[index],
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                            color: isActive ? Colors.black : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-      ],
+      ),
     );
   }
 
@@ -701,21 +848,21 @@ class TaskStatusDetailPage extends StatelessWidget {
     final status = data['status'] ?? 'Not Assigned';
 
     String message;
-    switch (status) {
-      case 'Not Assigned':
+    switch (status.toLowerCase()) {
+      case 'not assigned':
         message = 'Your report has been received and is waiting to be assigned to a worker.';
         break;
-      case 'Assigned':
+      case 'assigned':
         message = 'A worker has been assigned to your report and will begin work soon.';
         break;
-      case 'In Progress':
+      case 'in progress':
         message = 'Your report is currently being processed by the assigned worker.';
         break;
-      case 'Started':
+      case 'started':
         message = 'Work has started at the reported location.';
         break;
-      case 'Completed':
-        message = 'Your report has been fully processed and the issue has been resolved. Thank you!';
+      case 'completed':
+        message = 'Report Resolved:Report has been fully processed and the issue has been resolved';
         break;
       default:
         message = 'Status update pending.';
@@ -724,18 +871,26 @@ class TaskStatusDetailPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: status.toLowerCase() == 'completed' ? Colors.green.shade50 : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade100),
+        border: Border.all(
+            color: status.toLowerCase() == 'completed' ? Colors.green.shade100 : Colors.blue.shade100
+        ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Colors.blue),
+          Icon(
+              status.toLowerCase() == 'completed' ? Icons.check_circle_outline : Icons.info_outline,
+              color: status.toLowerCase() == 'completed' ? Colors.green : Colors.blue
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Colors.blue, fontSize: 14),
+              style: TextStyle(
+                  color: status.toLowerCase() == 'completed' ? Colors.green.shade700 : Colors.blue,
+                  fontSize: 14
+              ),
             ),
           ),
         ],
