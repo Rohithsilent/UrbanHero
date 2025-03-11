@@ -689,144 +689,147 @@ class _WasteReportFormState extends State<SecondPage> {
               ),
             ),
           ),
+          // Chat overlay
           if (isChatOpen)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.5,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
+            Container(
+                color: Colors.black.withOpacity(0.5),
+                width: double.infinity,
+                height: double.infinity,
+                child: Center(
+                  child: Container(
+                    height: MediaQuery.of(context).size.height * 0.75,
+                    width: MediaQuery.of(context).size.width * 0.9,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.lightGreenAccent.withOpacity(0.3),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(left: 16),
-                            child: Text(
-                              'Urban Hero Assistant',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.lightGreenAccent.withOpacity(0.3),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.lightGreenAccent,
+                                    radius: 15,
+                                    child: Icon(
+                                      Icons.eco,
+                                      size: 18,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Urban Hero Assistant',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => setState(() => isChatOpen = false),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => setState(() => isChatOpen = false),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(top: 10, bottom: 10),
-                        itemCount: chatMessages.length,
-                        itemBuilder: (context, index) {
-                          final message = chatMessages[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 4,
-                            ),
-                            child: Align(
-                              alignment: message['isBot']
-                                  ? Alignment.centerLeft
-                                  : Alignment.centerRight,
-                              child: Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: message['isBot']
-                                      ? Colors.grey[200]
-                                      : Colors.lightGreenAccent.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Text(
-                                  message['message'],
-                                  style: const TextStyle(
-                                    fontSize: 14,
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                            itemCount: chatMessages.length,
+                            itemBuilder: (context, index) {
+                              final message = chatMessages[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Align(
+                                  alignment: message['isBot']
+                                      ? Alignment.centerLeft
+                                      : Alignment.centerRight,
+                                  child: Container(
+                                    constraints: BoxConstraints(
+                                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: message['isBot']
+                                          ? Colors.grey[200]
+                                          : Colors.lightGreenAccent.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Text(
+                                      message['message'],
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              decoration: InputDecoration(
-                                hintText: 'Type a message...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                              ),
-                              onSubmitted: (text) {
-                                if (text.isNotEmpty) {
-                                  _sendMessage(text);
-                                }
-                              },
-                            ),
+                              );
+                            },
                           ),
-                          const SizedBox(width: 8),
-                          CircleAvatar(
-                            backgroundColor: Colors.lightGreenAccent,
-                            radius: 24,
-                            child: IconButton(
-                              icon: const Icon(Icons.send, color: Colors.black),
-                              onPressed: () {
-                                final text = _messageController.text.trim();
-                                if (text.isNotEmpty) {
-                                  _sendMessage(text);
-                                }
-                              },
-                            ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Type a message...',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onSubmitted: (text) {
+                                    if (text.isNotEmpty) {
+                                      _sendMessage(text);
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              CircleAvatar(
+                                backgroundColor: Colors.lightGreenAccent,
+                                radius: 24,
+                                child: IconButton(
+                                  icon: const Icon(Icons.send, color: Colors.black),
+                                  onPressed: () {
+                                    final text = _messageController.text.trim();
+                                    if (text.isNotEmpty) {
+                                      _sendMessage(text);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+                ),),
+
+
           if (isLoading)
             Container(
               color: Colors.black.withOpacity(0.3),
