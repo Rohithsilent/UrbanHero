@@ -17,7 +17,8 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  List<WasteReport> tasks = [];
+  List<WasteReport> pendingTasks = [];
+  List<WasteReport> completedTasks = [];
 
   @override
   void initState() {
@@ -40,18 +41,21 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           .where('assignedWorker', isEqualTo: workerUid)
           .get();
 
+      List<WasteReport> allTasks = snapshot.docs.map((doc) {
+        return WasteReport(
+          id: doc.id,
+          description: doc['description'] ?? '',
+          imageBase64: doc['imageBase64'] ?? '',
+          location: doc['location'] ?? '',
+          timestamp: (doc['timestamp'] != null) ? doc['timestamp'].toDate() : DateTime.now(),
+          wasteSize: doc['wasteSize'] ?? '',
+          status: doc['status'] ?? 'pending',
+        );
+      }).toList();
+
       setState(() {
-        tasks = snapshot.docs.map((doc) {
-          return WasteReport(
-            id: doc.id,
-            description: doc['description'] ?? '',
-            imageBase64: doc['imageBase64'] ?? '',
-            location: doc['location'] ?? '',
-            timestamp: (doc['timestamp'] != null) ? doc['timestamp'].toDate() : DateTime.now(),
-            wasteSize: doc['wasteSize'] ?? '',
-            status: doc['status'] ?? 'pending', // ✅ Default to 'pending' if null
-          );
-        }).toList();
+        pendingTasks = allTasks.where((task) => task.status != 'completed').toList();
+        completedTasks = allTasks.where((task) => task.status == 'completed').toList();
       });
     } catch (e) {
       print('Error fetching tasks: $e');
@@ -105,12 +109,96 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ],
         ),
       ),
-      body: ListView.builder(
-        itemCount: tasks.length,
-        itemBuilder: (context, index) {
-          final task = tasks[index];
-          return TaskCard(task: task, onUpdate: fetchTasks);
-        },
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Active Tasks Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.work, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Active Tasks (${pendingTasks.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  pendingTasks.isEmpty
+                      ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No active tasks'),
+                    ),
+                  )
+                      : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: pendingTasks.length,
+                    itemBuilder: (context, index) {
+                      return TaskCard(
+                          task: pendingTasks[index],
+                          onUpdate: fetchTasks
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Completed Tasks Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.grey[100],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Completed Tasks (${completedTasks.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  completedTasks.isEmpty
+                      ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No completed tasks'),
+                    ),
+                  )
+                      : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: completedTasks.length,
+                    itemBuilder: (context, index) {
+                      return TaskCard(
+                          task: completedTasks[index],
+                          onUpdate: fetchTasks
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -201,7 +289,7 @@ class TaskCard extends StatelessWidget {
       final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
       if (status == 'completed') {
-        await _uploadImage(context, ImageSource.camera); // Pass context here
+        await _uploadImage(context, ImageSource.camera);
 
         if (imageBase64.isEmpty) {
           print("⚠️ No image captured!");
@@ -247,7 +335,6 @@ class TaskCard extends StatelessWidget {
     }
   }
 
-
   final ImagePicker _picker = ImagePicker();
   String imageBase64 = '';
 
@@ -271,8 +358,6 @@ class TaskCard extends StatelessWidget {
       );
     }
   }
-
-
 }
 
 // WasteReport Model
@@ -292,6 +377,6 @@ class WasteReport {
     required this.location,
     required this.timestamp,
     required this.wasteSize,
-    required this.status, // ✅ Default value
+    required this.status,
   });
 }

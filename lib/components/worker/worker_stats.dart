@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +20,7 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
   double _avgResponseTime = 0.0;
   int _areasCovered = 0;
   double _customerRating = 0.0;
+  List<Map<String, dynamic>> _completedTasks = [];
 
   @override
   void initState() {
@@ -44,12 +47,27 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
           .get();
 
       // Get completed tasks
-      final completedTasks = tasksSnapshot.docs
+      final completedTaskDocs = tasksSnapshot.docs
           .where((doc) => doc['status'] == 'completed')
           .toList();
 
+      // Convert completed task documents to map
+      _completedTasks = completedTaskDocs.map((doc) {
+        return {
+          'id': doc.id,
+          'description': doc['description'] ?? '',
+          'location': doc['location'] ?? '',
+          'timestamp': doc['timestamp'] != null
+              ? (doc['timestamp'] as Timestamp).toDate()
+              : DateTime.now(),
+          'wasteSize': doc['wasteSize'] ?? '',
+          'imageBase64': doc['imageBase64'] ?? '',
+          'completedImageBase64': doc['completedImageBase64'] ?? '',
+        };
+      }).toList();
+
       // Calculate tasks completed
-      _tasksCompleted = completedTasks.length;
+      _tasksCompleted = _completedTasks.length;
 
       // Calculate areas covered (unique locations)
       final locations = tasksSnapshot.docs
@@ -123,6 +141,7 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Stats Summary
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
@@ -139,26 +158,58 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
               Icons.check_circle,
               Colors.green,
             ),
-            _buildStatCard(
-              'Average Response Time',
-              '${_avgResponseTime.toStringAsFixed(1)} hours',
-              Icons.timer,
-              Colors.blue,
-            ),
+            // _buildStatCard(
+            //   'Average Response Time',
+            //   '${_avgResponseTime.toStringAsFixed(1)} hours',
+            //   Icons.timer,
+            //   Colors.blue,
+            // ),
             _buildStatCard(
               'Areas Covered',
               _areasCovered.toString(),
               Icons.map,
               Colors.purple,
             ),
-            _buildStatCard(
-              'Customer Rating',
-              '${_customerRating.toStringAsFixed(1)}/5',
-              Icons.star,
-              Colors.orange,
-            ),
+            // _buildStatCard(
+            //   'Customer Rating',
+            //   '${_customerRating.toStringAsFixed(1)}/5',
+            //   Icons.star,
+            //   Colors.orange,
+            // ),
             const SizedBox(height: 20),
             _buildCompletionRate(),
+
+            // Completed Tasks Section
+            const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16, top: 8),
+              child: Text(
+                'Completed Tasks',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            _completedTasks.isEmpty
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Text(
+                  'No completed tasks yet',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _completedTasks.length,
+              itemBuilder: (context, index) {
+                final task = _completedTasks[index];
+                return _buildCompletedTaskCard(task);
+              },
+            ),
           ],
         ),
       ),
@@ -279,4 +330,115 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
       },
     );
   }
+
+  Widget _buildCompletedTaskCard(Map<String, dynamic> task) {
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Task #${task['id']}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${task['description']}',
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Location: ${task['location']}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Waste Size: ${task['wasteSize']}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Completed On: ${_formatDate(task['timestamp'])}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+
+            // Before and After Images
+            if (task['imageBase64'] != null || task['completedImageBase64'] != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text('Before', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        _buildImage(task['imageBase64'], 100),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text('After', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        _buildImage(task['completedImageBase64'], 100),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImage(String? imageBase64, double height) {
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      try {
+        return Image.memory(
+          base64Decode(imageBase64),
+          height: height,
+          fit: BoxFit.cover,
+        );
+      } catch (e) {
+        return Container(
+          height: height,
+          color: Colors.grey[300],
+          child: const Center(child: Text('Invalid Image')),
+        );
+      }
+    } else {
+      return Container(
+        height: height,
+        color: Colors.grey[300],
+        child: const Center(child: Text('No Image')),
+      );
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
 }
+
