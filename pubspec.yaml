@@ -72,6 +72,7 @@ flutter1:
     - assets/images/UrbanHero_icon.jpeg
     - assets/images/google.png
     - assets/
+    - assets/images/
 dev_dependencies:
   flutter_test:
     sdk: flutter
