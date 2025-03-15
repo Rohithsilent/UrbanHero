@@ -330,6 +330,28 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
       },
     );
   }
+  Widget _buildFullBleedImage(String? imageBase64) {
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      try {
+        return Image.memory(
+          base64Decode(imageBase64),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+        );
+      } catch (e) {
+        return Container(
+          color: Colors.grey[300],
+          child: const Center(child: Text('Invalid Image')),
+        );
+      }
+    } else {
+      return Container(
+        color: Colors.grey[300],
+        child: const Center(child: Text('No Image')),
+      );
+    }
+  }
 
   Widget _buildCompletedTaskCard(Map<String, dynamic> task) {
     return Card(
@@ -380,32 +402,72 @@ class _WorkerStatsScreenState extends State<WorkerStatsScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Before and After Images
+            //before and after images
             if (task['imageBase64'] != null || task['completedImageBase64'] != null)
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+              Container(
+                height: 220,
+                margin: const EdgeInsets.only(top: 8),
+                child: PageView(
+                  controller: PageController(),
+                  children: [
+                    Stack(
                       children: [
-                        const Text('Before', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        _buildImage(task['imageBase64'], 100),
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _buildFullBleedImage(task['imageBase64']),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Text(
+                              'Before',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    Stack(
                       children: [
-                        const Text('After', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        _buildImage(task['completedImageBase64'], 100),
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _buildFullBleedImage(task['completedImageBase64']),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Text(
+                              'After',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
           ],
         ),

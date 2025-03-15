@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:geocoding/geocoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
+import '../../screens/flutter-login.dart';
 
 class WorkerHomeScreen extends StatefulWidget {
   const WorkerHomeScreen({super.key});
@@ -13,21 +16,34 @@ class WorkerHomeScreen extends StatefulWidget {
   _WorkerHomeScreenState createState() => _WorkerHomeScreenState();
 }
 
-class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
+class _WorkerHomeScreenState extends State<WorkerHomeScreen> with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  late TabController _tabController;
 
   List<WasteReport> pendingTasks = [];
   List<WasteReport> completedTasks = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     fetchTasks();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   // Fetch the tasks (waste reports) from Firestore
   Future<void> fetchTasks() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       String? workerUid = _auth.currentUser?.uid;
 
@@ -56,212 +72,395 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       setState(() {
         pendingTasks = allTasks.where((task) => task.status != 'completed').toList();
         completedTasks = allTasks.where((task) => task.status == 'completed').toList();
+        _isLoading = false;
       });
     } catch (e) {
       print('Error fetching tasks: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Worker Dashboard'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Worker Dashboard',
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => Navigator.pushNamed(context, '/profilew'),
+            icon: const Icon(Icons.refresh, color: Colors.black87),
+            onPressed: fetchTasks,
           ),
+          // IconButton(
+          //   icon: const Icon(Icons.person, color: Colors.black87),
+          //   onPressed: () => Navigator.pushNamed(context, '/profilew'),
+          // ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.blue,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.blue,
+          tabs: [
+            Tab(
+              // icon: Icon(Icons.work),
+              text: 'Active (${pendingTasks.length})',
+            ),
+            Tab(
+              // icon: Icon(Icons.check_circle),
+              text: 'Completed (${completedTasks.length})',
+            ),
+          ],
+        ),
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
+        child: Container(
+          color: Colors.white,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade700, Colors.blue.shade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 35, color: Colors.blue.shade700),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Waste Management',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      _auth.currentUser?.email ?? 'Worker',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/profilew');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.pending),
-              title: const Text('My Performance'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/perform');
-              },
-            ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.person, color: Colors.blue),
+                title: const Text('Profile'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/profilew');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.bar_chart, color: Colors.blue),
+                title: const Text('My Performance'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/perform');
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Logout'),
+                onTap: () async {
+                  await _auth.signOut();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        (route) => false,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Active Tasks Section
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.work, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Active Tasks (${pendingTasks.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(),
-                  pendingTasks.isEmpty
-                      ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('No active tasks'),
-                    ),
-                  )
-                      : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: pendingTasks.length,
-                    itemBuilder: (context, index) {
-                      return TaskCard(
-                          task: pendingTasks[index],
-                          onUpdate: fetchTasks
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+        controller: _tabController,
+        children: [
+          // Active Tasks Tab
+          _buildTasksList(pendingTasks, isActive: true),
 
-            // Completed Tasks Section
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.grey[100],
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Completed Tasks (${completedTasks.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(),
-                  completedTasks.isEmpty
-                      ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('No completed tasks'),
-                    ),
-                  )
-                      : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: completedTasks.length,
-                    itemBuilder: (context, index) {
-                      return TaskCard(
-                          task: completedTasks[index],
-                          onUpdate: fetchTasks
-                      );
-                    },
-                  ),
-                ],
+          // Completed Tasks Tab
+          _buildTasksList(completedTasks, isActive: false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksList(List<WasteReport> tasks, {required bool isActive}) {
+    if (tasks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isActive ? Icons.work_off : Icons.check_circle_outline,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isActive ? 'No active tasks' : 'No completed tasks',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
               ),
             ),
           ],
         ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: fetchTasks,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: tasks.length,
+        itemBuilder: (context, index) {
+          return ModernTaskCard(
+            task: tasks[index],
+            onUpdate: fetchTasks,
+            isActive: isActive,
+          );
+        },
       ),
     );
   }
 }
 
-class TaskCard extends StatelessWidget {
+class ModernTaskCard extends StatelessWidget {
   final WasteReport task;
   final VoidCallback onUpdate;
+  final bool isActive;
 
-  TaskCard({super.key, required this.task, required this.onUpdate});
+  ModernTaskCard({super.key, required this.task, required this.onUpdate, required this.isActive});
+
+  Future<String> _getAddressFromCoordinates(String locationStr) async {
+    try {
+      // Parse location string (assuming format is "lat,lng")
+      List<String> coordinates = locationStr.split(',');
+      if (coordinates.length != 2) return locationStr;
+
+      double lat = double.tryParse(coordinates[0].trim()) ?? 0.0;
+      double lng = double.tryParse(coordinates[1].trim()) ?? 0.0;
+
+      // Use the geocoding package to get the address
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        return '${place.street}, ${place.subLocality}, ${place.locality}';
+      }
+      return locationStr;
+    } catch (e) {
+      print('Error getting address: $e');
+      return locationStr;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.all(8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Task #${task.id}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image section with status overlay
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                child: _buildImage(task.imageBase64),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: _buildStatusChip(task.status),
+              ),
+            ],
+          ),
+
+          // Task details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and ID
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.description,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '#${task.id.substring(0, 5)}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Location
+
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.grey[600], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FutureBuilder<String>(
+                        future: _getAddressFromCoordinates(task.location),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return Text('Loading address...', style: TextStyle(color: Colors.grey[700]));
+                          } else if (snapshot.hasData) {
+                            return Text(
+                              snapshot.data!,
+                              style: TextStyle(color: Colors.grey[700]),
+                            );
+                          } else {
+                            return Text(
+                              task.location,
+                              style: TextStyle(color: Colors.grey[700]),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Waste size and timestamp
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.grey[600], size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            task.wasteSize,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.grey[600], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat('MMM dd, HH:mm').format(task.timestamp),
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // Action buttons
+                if (isActive) const SizedBox(height: 16),
+                if (isActive) _buildActionButtons(context),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text('Description: ${task.description}'),
-            const SizedBox(height: 8),
-            _buildImage(task.imageBase64),
-            const SizedBox(height: 8),
-            Text('Location: ${task.location}'),
-            const SizedBox(height: 8),
-            Text('Waste Size: ${task.wasteSize}'),
-            const SizedBox(height: 8),
-            Text('Reported At: ${task.timestamp}'),
-            const SizedBox(height: 8),
-            Text(
-              'Status: ${task.status}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: task.status == 'completed' ? Colors.green : Colors.orange,
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color chipColor;
+    IconData chipIcon;
+    String statusText;
+
+    switch (status) {
+      case 'pending':
+        chipColor = Colors.orange;
+        chipIcon = Icons.access_time;
+        statusText = 'Pending';
+        break;
+      case 'Assigned':
+        chipColor = Colors.blue;
+        chipIcon = Icons.assignment_ind;
+        statusText = 'Assigned';
+        break;
+      case 'started':
+        chipColor = Colors.amber;
+        chipIcon = Icons.play_arrow;
+        statusText = 'In Progress';
+        break;
+      case 'completed':
+        chipColor = Colors.green;
+        chipIcon = Icons.check_circle;
+        statusText = 'Completed';
+        break;
+      default:
+        chipColor = Colors.grey;
+        chipIcon = Icons.help_outline;
+        statusText = status;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: chipColor.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(chipIcon, color: Colors.white, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            statusText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
-            const SizedBox(height: 16),
-
-            if (task.status == 'Assigned')
-              ElevatedButton(
-                onPressed: () => _updateStatus(context, 'started'),
-                child: const Text('Start'),
-              ),
-
-            if (task.status == 'started')
-              ElevatedButton(
-                onPressed: () => _updateStatus(context, 'completed'),
-                child: const Text('Complete'),
-              ),
-
-            if (task.status == 'completed')
-              const Text(
-                'Completed ✅',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -270,19 +469,81 @@ class TaskCard extends StatelessWidget {
     if (imageBase64.isNotEmpty) {
       return Image.memory(
         const Base64Decoder().convert(imageBase64),
-        height: 200,
+        height: 180,
         width: double.infinity,
         fit: BoxFit.cover,
       );
     } else {
       return Container(
-        height: 200,
+        height: 180,
         width: double.infinity,
         color: Colors.grey[300],
-        child: const Center(child: Text('No Image Available')),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+              SizedBox(height: 8),
+              Text('No Image Available'),
+            ],
+          ),
+        ),
       );
     }
   }
+
+  Widget _buildActionButtons(BuildContext context) {
+    if (task.status == 'Assigned') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _updateStatus(context, 'started'),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('START TASK'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    } else if (task.status == 'started') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _updateStatus(context, 'completed'),
+          icon: const Icon(Icons.check_circle),
+          label: const Text('MARK AS COMPLETE'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    } else if (task.status == 'pending') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: null,
+          icon: const Icon(Icons.hourglass_empty),
+          label: const Text('AWAITING ASSIGNMENT'),
+          style: ElevatedButton.styleFrom(
+            disabledBackgroundColor: Colors.grey[300],
+            disabledForegroundColor: Colors.grey[700],
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  final ImagePicker _picker = ImagePicker();
+  String imageBase64 = '';
 
   Future<void> _updateStatus(BuildContext context, String status) async {
     try {
@@ -294,7 +555,7 @@ class TaskCard extends StatelessWidget {
         if (imageBase64.isEmpty) {
           print("⚠️ No image captured!");
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No image selected. Please try again.')),
+            const SnackBar(content: Text('No image selected. Please take a photo of the completed task.')),
           );
           return;
         }
@@ -303,6 +564,7 @@ class TaskCard extends StatelessWidget {
         await _firestore.collection('waste_reports').doc(task.id).update({
           'status': 'completed',
           'completedImageBase64': imageBase64,
+          'completedTimestamp': DateTime.now(),
         });
 
         // Save completed report in "reported_issues"
@@ -314,29 +576,34 @@ class TaskCard extends StatelessWidget {
           'imageBase64': task.imageBase64, // Original waste image
           'completedImageBase64': imageBase64, // Cleaned area image
           'status': 'completed',
+          'completedTimestamp': DateTime.now(),
         });
 
       } else {
         await _firestore.collection('waste_reports').doc(task.id).update({
-          'status': 'started',
+          'status': status,
+          'startedTimestamp': DateTime.now(),
         });
       }
 
       onUpdate(); // Refresh UI
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $status')),
+        SnackBar(
+          content: Text('Task ${status == 'completed' ? 'completed' : 'started'}'),
+          backgroundColor: status == 'completed' ? Colors.green : Colors.blue,
+        ),
       );
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update status')),
+        SnackBar(
+          content: Text('Failed to update status: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
-
-  final ImagePicker _picker = ImagePicker();
-  String imageBase64 = '';
 
   Future<void> _uploadImage(BuildContext context, ImageSource source) async {
     try {
@@ -354,7 +621,7 @@ class TaskCard extends StatelessWidget {
       imageBase64 = base64Encode(imageBytes);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading image: $e')),
+        SnackBar(content: Text('Error capturing image: $e')),
       );
     }
   }
