@@ -54,6 +54,9 @@ flutter1:
     - assets/images/google.png
     - assets/
     - assets/images/
+
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,7 +66,6 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/images/UrbanHero_icon.jpeg"
-
 
   flutter_lints: ^3.0.0
 
