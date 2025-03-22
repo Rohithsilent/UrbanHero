@@ -16,6 +16,7 @@ The absence of real-time reporting mechanisms and proper incentivization has res
 ## 💡 Solution Approach
 Our project addresses these issues through an AI-powered waste management platform with the following key features:
 
+
 1. **🖼️ Waste Detection with AI**:
    - Utilizes TensorFlow for image processing to accurately identify waste from citizen-submitted photos.
    - Tracks waste location for precise monitoring and reporting.
